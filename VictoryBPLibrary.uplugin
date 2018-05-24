@@ -25,8 +25,16 @@
 			[
 				"Win64",
 				"Win32",
-				"HTML5"
+				"HTML5",
+				"Linux"
 			]
+		}
+	],
+	"Plugins" :
+	[
+		{
+			"Name": "ApexDestruction",
+			"Enabled": true
 		}
 	]
 }

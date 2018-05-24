@@ -6,6 +6,9 @@
  
 #include "VictoryBPFunctionLibrary.h"
 
+//Foreground Window check, clipboard copy/paste
+#include "Runtime/ApplicationCore/Public/HAL/PlatformApplicationMisc.h"
+
 //FGPUDriverInfo GPU 
 #include "Runtime/Core/Public/GenericPlatform/GenericPlatformDriver.h"
  
@@ -29,16 +32,25 @@
 #endif // WITH_EDITOR
 */
 
+// To be able to perform regex operatins on level stream info package name
+#if WITH_EDITOR
+	#include "Runtime/Core/Public/Internationalization/Regex.h"
+#endif
 
-#include "Runtime/ImageWrapper/Public/Interfaces/IImageWrapper.h"
-#include "Runtime/ImageWrapper/Public/Interfaces/IImageWrapperModule.h"
+//~~~ Image Wrapper ~~~
+#include "ImageUtils.h"
+#include "IImageWrapper.h"
+#include "IImageWrapperModule.h"
+//~~~ Image Wrapper ~~~
 
 //Body Setup
 #include "PhysicsEngine/BodySetup.h"
 
+#include "DestructibleComponent.h"
+
 
 //Apex issues, can add iOS here  <3 Rama
-#if PLATFORM_ANDROID || PLATFORM_HTML5_BROWSER || PLATFORM_IOS
+#if PLATFORM_ANDROID || PLATFORM_HTML5 || PLATFORM_IOS
 #ifdef WITH_APEX
 #undef WITH_APEX
 #endif
@@ -52,7 +64,9 @@
 //For Scene Locking using Epic's awesome helper macros like SCOPED_SCENE_READ_LOCK
 #include "Runtime/Engine/Private/PhysicsEngine/PhysXSupport.h"
 //~~~~~~~~~~~
- 
+
+#include "IXRTrackingSystem.h"
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //									Saxon Rah Random Nodes
 // Chrono and Random
@@ -287,7 +301,7 @@ ULevelStreaming* UVictoryBPFunctionLibrary::VictoryLoadLevelInstance(
 	Success = false; 
     if(!WorldContextObject) return nullptr;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return nullptr;
 	//~~~~~~~~~~~
  
@@ -669,6 +683,7 @@ bool UVictoryBPFunctionLibrary::JoyFileIO_GetFiles(TArray<FString>& Files, FStri
 	}
 	
 	FString FinalPath = RootFolderFullPath + "/" + Ext;
+	
 	FileManager.FindFiles(Files, *FinalPath, true, false);
 	return true;				  
 }
@@ -792,7 +807,7 @@ void UVictoryBPFunctionLibrary::VictoryISM_GetAllVictoryISMActors(UObject* World
 {
 	if(!WorldContextObject) return;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	
@@ -817,7 +832,7 @@ void UVictoryBPFunctionLibrary::VictoryISM_ConvertToVictoryISMActors(
 	
 	if(!WorldContextObject) return;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	
@@ -935,12 +950,16 @@ FString UVictoryBPFunctionLibrary::VictoryPaths__WindowsNoEditorDir()
 
 FString UVictoryBPFunctionLibrary::VictoryPaths__GameRootDirectory()
 {
-	return FPaths::ConvertRelativePathToFull(FPaths::GameDir());
+	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir());
 }
 
 FString UVictoryBPFunctionLibrary::VictoryPaths__SavedDir()
 {
-	return FPaths::ConvertRelativePathToFull(FPaths::GameSavedDir());
+	return FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+}
+FString UVictoryBPFunctionLibrary::VictoryPaths__ConfigDir()
+{
+	return FPaths::ConvertRelativePathToFull(FPaths::ProjectConfigDir());
 }
 
 FString UVictoryBPFunctionLibrary::VictoryPaths__ScreenShotsDir()
@@ -950,7 +969,7 @@ FString UVictoryBPFunctionLibrary::VictoryPaths__ScreenShotsDir()
  
 FString UVictoryBPFunctionLibrary::VictoryPaths__LogsDir()
 {
-	return FPaths::ConvertRelativePathToFull(FPaths::GameLogDir());
+	return FPaths::ConvertRelativePathToFull(FPaths::ProjectLogDir());
 }
 
 
@@ -1203,7 +1222,7 @@ void UVictoryBPFunctionLibrary::GetAllWidgetsOfClass(UObject* WorldContextObject
 	if(!WidgetClass) return;
 	if(!WorldContextObject) return;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	
@@ -1236,7 +1255,7 @@ void UVictoryBPFunctionLibrary::RemoveAllWidgetsOfClass(UObject* WorldContextObj
 	if(!WidgetClass) return;
 	if(!WorldContextObject) return;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	 
@@ -1261,7 +1280,7 @@ bool UVictoryBPFunctionLibrary::IsWidgetOfClassInViewport(UObject* WorldContextO
 	if(!WidgetClass) return false;
 	if(!WorldContextObject) return false;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return false;
 	//~~~~~~~~~~~
 	  
@@ -1286,7 +1305,7 @@ void UVictoryBPFunctionLibrary::ServerTravel(UObject* WorldContextObject, FStrin
 { 
 	if(!WorldContextObject) return;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	 
@@ -1296,7 +1315,7 @@ APlayerStart* UVictoryBPFunctionLibrary::GetPlayerStart(UObject* WorldContextObj
 {
 	if(!WorldContextObject) return nullptr;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return nullptr;
 	//~~~~~~~~~~~
 	
@@ -1652,29 +1671,29 @@ void UVictoryBPFunctionLibrary::VictorySetCustomConfigVar_String(FString Section
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-EVictoryHMDDevice UVictoryBPFunctionLibrary::GetHeadMountedDisplayDeviceType()
+FName UVictoryBPFunctionLibrary::GetHeadMountedDisplayDeviceType()
 {
-	if(!GEngine) return EVictoryHMDDevice::None;
+	/*
+		4.19 
+		The IHeadMountedDisplay::GetHMDDeviceType() method has been removed as it was not extensible 
+		enough. Code that needs know which XR plugin is currently active should use 
+		IXRTrackingSystem::GetSystemName() instead.
+	*/
+	if(!GEngine) return "None";
 	 
-	if (GEngine->HMDDevice.IsValid())
+	if (GEngine->XRSystem.IsValid() && GEngine->XRSystem->GetHMDDevice())
 	{  
 		//Actively connected?
-		if(!GEngine->HMDDevice->IsHMDConnected()) 
+		if(!GEngine->XRSystem->GetHMDDevice()->IsHMDConnected())
 		{  
-			return EVictoryHMDDevice::None;
+			return "None";
 		} 
 		
-		switch (GEngine->HMDDevice->GetHMDDeviceType()) 
-		{       
-			case EHMDDeviceType::DT_OculusRift 				: return EVictoryHMDDevice::OculusRift;
-			case EHMDDeviceType::DT_Morpheus 				: return EVictoryHMDDevice::Morpheus;
-			case EHMDDeviceType::DT_SteamVR 				: return EVictoryHMDDevice::SteamVR;
-			case EHMDDeviceType::DT_ES2GenericStereoMesh 	: return EVictoryHMDDevice::ES2GenericStereoMesh;
-			case EHMDDeviceType::DT_GearVR 					: return EVictoryHMDDevice::GearVR;
-		}
+		//!See IIdentifiableXRDevice.h
+		return GEngine->XRSystem->GetSystemName();
 	}
 	  
-	return EVictoryHMDDevice::None;
+	return "None";
 }
 
 
@@ -1747,7 +1766,7 @@ UObject* UVictoryBPFunctionLibrary::CreateObject(UObject* WorldContextObject,UCl
 	//~~~~~~~~~~~~~~~~~
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return NULL;
 	//~~~~~~~~~~~
 	    
@@ -1766,7 +1785,7 @@ UPrimitiveComponent* UVictoryBPFunctionLibrary::CreatePrimitiveComponent(
 	//~~~~~~~~~~~~~~~~~
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return NULL;
 	//~~~~~~~~~~~
 	 
@@ -1787,7 +1806,7 @@ AActor* UVictoryBPFunctionLibrary::SpawnActorIntoLevel(UObject* WorldContextObje
 	//~~~~~~~~~~~~~~~~~
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return NULL;
 	//~~~~~~~~~~~
 	
@@ -1833,7 +1852,7 @@ void UVictoryBPFunctionLibrary::GetNamesOfLoadedLevels(UObject* WorldContextObje
 {
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	
@@ -2006,7 +2025,7 @@ void UVictoryBPFunctionLibrary::DrawCircle(
 	if(!WorldContextObject) return ;
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	 
@@ -2114,7 +2133,7 @@ AActor* UVictoryBPFunctionLibrary::GetClosestActorOfClassInRadiusOfLocation(
 	IsValid = false;
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return NULL;
 	//~~~~~~~~~~~
 	
@@ -2133,8 +2152,12 @@ AActor* UVictoryBPFunctionLibrary::GetClosestActorOfClassInRadiusOfLocation(
 		}
 	}
 
-   IsValid = true;
-   return ClosestActor;
+	if (ClosestActor)
+	{
+		IsValid = true;
+	}
+
+	return ClosestActor;
 } 
 
 AActor* UVictoryBPFunctionLibrary::GetClosestActorOfClassInRadiusOfActor(
@@ -2154,7 +2177,7 @@ AActor* UVictoryBPFunctionLibrary::GetClosestActorOfClassInRadiusOfActor(
 	const FVector Center = ActorCenter->GetActorLocation();
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return NULL;
 	//~~~~~~~~~~~
 	
@@ -2177,8 +2200,12 @@ AActor* UVictoryBPFunctionLibrary::GetClosestActorOfClassInRadiusOfActor(
 		}
 	}
 
-   IsValid = true;
-   return ClosestActor;
+	if (ClosestActor)
+	{
+		IsValid = true;
+	}
+
+	return ClosestActor;
 }
 
 void UVictoryBPFunctionLibrary::Selection_SelectionBox(UObject* WorldContextObject,TArray<AActor*>& SelectedActors, FVector2D AnchorPoint,FVector2D DraggedPoint,TSubclassOf<AActor> ClassFilter)
@@ -2187,7 +2214,7 @@ void UVictoryBPFunctionLibrary::Selection_SelectionBox(UObject* WorldContextObje
 	
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	
@@ -2431,11 +2458,11 @@ bool UVictoryBPFunctionLibrary::IsAlphaNumeric(const FString& String)
 
 void UVictoryBPFunctionLibrary::Victory_GetStringFromOSClipboard(FString& FromClipboard)
 {  
-	FPlatformMisc::ClipboardPaste(FromClipboard);
+	FPlatformApplicationMisc::ClipboardPaste(FromClipboard);
 } 
 void UVictoryBPFunctionLibrary::Victory_SaveStringToOSClipboard(const FString& ToClipboard)
 {
-	FPlatformMisc::ClipboardCopy(*ToClipboard);
+	FPlatformApplicationMisc::ClipboardCopy(*ToClipboard);
 }
 	
 
@@ -2535,7 +2562,7 @@ AStaticMeshActor* UVictoryBPFunctionLibrary::Clone__StaticMeshActor(UObject* Wor
 	if(!WorldContextObject) return NULL;
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return NULL;
 	//~~~~~~~~~~~
 	
@@ -2620,7 +2647,7 @@ bool UVictoryBPFunctionLibrary::WorldType__InEditorWorld(UObject* WorldContextOb
 	if(!WorldContextObject) return false;
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return false;
 	//~~~~~~~~~~~
 	
@@ -2632,7 +2659,7 @@ bool UVictoryBPFunctionLibrary::WorldType__InPIEWorld(UObject* WorldContextObjec
 	if(!WorldContextObject) return false;
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return false;
 	//~~~~~~~~~~~
 	
@@ -2643,7 +2670,7 @@ bool UVictoryBPFunctionLibrary::WorldType__InGameInstanceWorld(UObject* WorldCon
 	if(!WorldContextObject) return false;
 	
 	//using a context object to get the world!
-    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+    UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return false;
 	//~~~~~~~~~~~
 	
@@ -2848,7 +2875,7 @@ void UVictoryBPFunctionLibrary::Visibility__GetRenderedActors(UObject* WorldCont
 {
 	if(!WorldContextObject) return;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	
@@ -2868,7 +2895,7 @@ void UVictoryBPFunctionLibrary::Visibility__GetNotRenderedActors(UObject* WorldC
 {
 	if(!WorldContextObject) return;
 	 
-	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!World) return;
 	//~~~~~~~~~~~
 	
@@ -2896,7 +2923,7 @@ void UVictoryBPFunctionLibrary::Rendering__UnFreezeGameRendering()
 	
 bool UVictoryBPFunctionLibrary::ClientWindow__GameWindowIsForeGroundInOS()
 {   
-	return FPlatformProcess::IsThisApplicationForeground();
+	return FPlatformApplicationMisc::IsThisApplicationForeground();
 	/*
 	//Iterate Over Actors
 	UWorld* TheWorld = NULL;
@@ -3253,7 +3280,7 @@ AActor* UVictoryBPFunctionLibrary::Traces__CharacterMeshTrace___ClosestSocket(
 	
 	if(!WorldContextObject) return nullptr;
 	 
-	UWorld* const TheWorld = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* const TheWorld = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if(!TheWorld) return nullptr;
 	//~~~~~~~~~~~
 	 
@@ -3734,218 +3761,6 @@ bool UVictoryBPFunctionLibrary::LensFlare__GetLensFlareOffsets(
 	return true;
 }
 
-
-bool UVictoryBPFunctionLibrary::AnimatedVertex__GetAnimatedVertexLocations(
-	USkeletalMeshComponent* Mesh, 
-	TArray<FVector>& Locations
-){
-	if(!Mesh) return false;
-	if(!Mesh->SkeletalMesh) return false;
-	//~~~~~~~~~
-	 
-	//~~~~~~~~~~~~~
-	Locations.Empty(); 
-	//~~~~~~~~~~~~~
-	 
-	Mesh->ComputeSkinnedPositions(Locations);
-	
-	FTransform ToWorld = Mesh->GetComponentTransform();
-	FVector WorldLocation = ToWorld.GetLocation();
-	
-	for(FVector& Each : Locations)
-	{
-		Each = WorldLocation + ToWorld.TransformVector(Each);
-	} 
-	
-	return true;
-}
-	
-/*
-bool UVictoryBPFunctionLibrary::AnimatedVertex__GetAnimatedVertexLocationsAndNormals(
-	USkeletalMeshComponent* Mesh, 
-	TArray<FVector>& Locations, 
-	TArray<FVector>& Normals 
-)
-{
-	if(!Mesh) return false;
-	if(!Mesh->SkeletalMesh) return false;
-	//~~~~~~~~~
-	
-	Locations.Empty(); 
-	Normals.Empty();
-	//~~~~~~~~~~~~~~~~~~~
-	
-	//	Get the Verticies For Each Bone, Most Influenced by That Bone!
-	//					Vertices are in Bone space.
-	TArray<FBoneVertInfo> BoneVertexInfos;
-	FSkeletalMeshTools::CalcBoneVertInfos(Mesh->SkeletalMesh,BoneVertexInfos,true); //true = only dominant influence
-	
-	//~~~~~~~~~~~~~~~~~~~~~
-	int32 VertItr = 0;
-	FBoneVertInfo* EachBoneVertInfo;
-	FVector BoneWorldPos;
-	int32 NumOfVerticies;
-	FTransform RV_Transform;
-	FVector RV_Vect;
-	for(int32 Itr=0; Itr < BoneVertexInfos.Num() ; Itr++)
-	{
-		EachBoneVertInfo = &BoneVertexInfos[Itr];
-		//~~~~~~~~~~~~~~~~~~~~~~~~
-		
-		//Bone Transform To World Space, and Location
-		RV_Transform = Mesh->GetBoneTransform(Itr);
-		BoneWorldPos = RV_Transform.GetLocation();
-		
-		//How many verts is this bone influencing?
-		NumOfVerticies = EachBoneVertInfo->Positions.Num();
-		for(VertItr=0; VertItr < NumOfVerticies ; VertItr++)
-		{
-			//Animated Vertex Location!
-			Locations.Add(  BoneWorldPos + RV_Transform.TransformVector(EachBoneVertInfo->Positions[VertItr])  );
-		
-			//Animated Vertex Normal for rotating the emitter!!!!!
-			Normals.Add(  RV_Transform.TransformVector(EachBoneVertInfo->Normals[VertItr])  );
-		}
-	}
-	
-	//~~~ Cleanup ~~~
-	BoneVertexInfos.Empty();
-	
-	return true;
-}
-	
-bool UVictoryBPFunctionLibrary::AnimatedVertex__DrawAnimatedVertexLocations(
-	UObject* WorldContextObject,
-	USkeletalMeshComponent* Mesh, 
-	float ChanceToSkipAVertex, 
-	bool DrawNormals
-)
-{
-	UWorld* const TheWorld = GEngine->GetWorldFromContextObject(WorldContextObject);
-	
-	if(!TheWorld) return false;
-	if(!Mesh) return false;
-	if(!Mesh->SkeletalMesh) return false;
-	//~~~~~~~~~
-	
-	//	Get the Verticies For Each Bone, Most Influenced by That Bone!
-	//					Vertices are in Bone space.
-	TArray<FBoneVertInfo> BoneVertexInfos;
-	FSkeletalMeshTools::CalcBoneVertInfos(Mesh->SkeletalMesh,BoneVertexInfos,true); //true = only dominant influence
-	
-	//~~~~~~~~~~~~~~~~~~~~~
-	int32 VertItr = 0;
-	FBoneVertInfo* EachBoneVertInfo;
-	FVector BoneWorldPos;
-	int32 NumOfVerticies;
-	FTransform RV_Transform;
-	FVector RV_Vect;
-	
-	const FColor HappyRed = FColor(255,0,0);
-	const FColor HappyBlue = FColor(0,0,255);
-	for(int32 Itr=0; Itr < BoneVertexInfos.Num() ; Itr++)
-	{
-		EachBoneVertInfo = &BoneVertexInfos[Itr];
-		//~~~~~~~~~~~~~~~~~~~~~~~~
-		
-		//Bone Transform To World Space, and Location
-		RV_Transform = Mesh->GetBoneTransform(Itr);
-		BoneWorldPos = RV_Transform.GetLocation();
-		
-		//How many verts is this bone influencing?
-		NumOfVerticies = EachBoneVertInfo->Positions.Num();
-		for(VertItr=0; VertItr < NumOfVerticies ; VertItr++)
-		{
-			if(FMath::FRandRange(0, 1) < ChanceToSkipAVertex) continue;
-			//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			
-			RV_Vect = BoneWorldPos + RV_Transform.TransformVector(EachBoneVertInfo->Positions[VertItr]);
-			
-			DrawDebugPoint(
-				TheWorld, 
-				RV_Vect,
-				12, 
-				HappyRed, 
-				false, 
-				0.03
-			);
-			
-			if(DrawNormals)
-			{
-			DrawDebugLine(
-				TheWorld, 
-				RV_Vect, 
-				RV_Vect + RV_Transform.TransformVector(EachBoneVertInfo->Normals[VertItr] * 64),  
-				HappyBlue, 
-				false, 
-				0.03, 
-				0, 
-				1
-			);
-			}
-		}
-	}
-	
-	//~~~ Cleanup ~~~
-	BoneVertexInfos.Empty();
-	
-	return true;
-}
-	
-bool UVictoryBPFunctionLibrary::AnimatedVertex__GetCharacterAnimatedVertexLocations(
-	AActor* TheCharacter, 
-	TArray<FVector>& Locations
-)
-{
-	ACharacter * AsCharacter = Cast<ACharacter>(TheCharacter);
-	if (!AsCharacter) return false;
-	
-	USkeletalMeshComponent* Mesh = AsCharacter->GetMesh();
-	if (!Mesh) return false;
-	//~~~~~~~~~~~~~~~~~~~~
-	
-	AnimatedVertex__GetAnimatedVertexLocations(Mesh,Locations);
-	
-	return true;
-}
-	
-bool UVictoryBPFunctionLibrary::AnimatedVertex__GetCharacterAnimatedVertexLocationsAndNormals(
-	AActor* TheCharacter, 
-	TArray<FVector>& Locations, 
-	TArray<FVector>& Normals 
-)
-{
-	ACharacter * AsCharacter = Cast<ACharacter>(TheCharacter);
-	if (!AsCharacter) return false;
-	
-	USkeletalMeshComponent* Mesh = AsCharacter->GetMesh();
-	if (!Mesh) return false;
-	//~~~~~~~~~~~~~~~~~~~~
-	
-	AnimatedVertex__GetAnimatedVertexLocationsAndNormals(Mesh,Locations,Normals);
-	
-	return true;
-}
-	
-bool UVictoryBPFunctionLibrary::AnimatedVertex__DrawCharacterAnimatedVertexLocations(
-	AActor* TheCharacter, 
-	float ChanceToSkipAVertex, 
-	bool DrawNormals
-)
-{	
-	ACharacter * AsCharacter = Cast<ACharacter>(TheCharacter);
-	if (!AsCharacter) return false;
-	
-	USkeletalMeshComponent* Mesh = AsCharacter->GetMesh();
-	if (!Mesh) return false;
-	//~~~~~~~~~~~~~~~~~~~~
-	
-	AnimatedVertex__DrawAnimatedVertexLocations(TheCharacter,Mesh,ChanceToSkipAVertex,DrawNormals);
-	
-	return true;
-}
-*/
-
 //SMA Version
 float UVictoryBPFunctionLibrary::DistanceToSurface__DistaceOfPointToMeshSurface(AStaticMeshActor* TheSMA, const FVector& TestPoint, FVector& ClosestSurfacePoint)
 {
@@ -4157,7 +3972,7 @@ void UVictoryBPFunctionLibrary::String__ExplodeString(TArray<FString>& OutputStr
 					SeparatorIndex = 0;
 					PartialMatchStart = -1;
 					if (bTrimElements == true) {
-						OutputStrings.Add(FString(Section).Trim().TrimTrailing());
+						OutputStrings.Add(FString(Section).TrimStart().TrimEnd());
 					}
 					else {
 						OutputStrings.Add(FString(Section));
@@ -4194,7 +4009,7 @@ void UVictoryBPFunctionLibrary::String__ExplodeString(TArray<FString>& OutputStr
 
 		//If there is anything left in Section or Extra. They should be added as a new entry.
 		if (bTrimElements == true) {
-			OutputStrings.Add(FString(Section + Extra).Trim().TrimTrailing());
+			OutputStrings.Add(FString(Section + Extra).TrimStart().TrimEnd());
 		}
 		else {
 			OutputStrings.Add(FString(Section + Extra));
@@ -4301,7 +4116,7 @@ UTexture2D* UVictoryBPFunctionLibrary::LoadTexture2D_FromDDSFile(const FString& 
 
 
 //this is how you can make cpp only internal functions!
-static EImageFormat::Type GetJoyImageFormat(EJoyImageFormats JoyFormat)
+static EImageFormat GetJoyImageFormat(EJoyImageFormats JoyFormat)
 {
 	/*
 	ImageWrapper.h
@@ -4368,7 +4183,7 @@ UTexture2D* UVictoryBPFunctionLibrary::Victory_LoadTexture2D_FromFile(const FStr
 	UTexture2D* LoadedT2D = NULL;
 	
 	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
-	IImageWrapperPtr ImageWrapper = ImageWrapperModule.CreateImageWrapper(GetJoyImageFormat(ImageFormat));
+	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(GetJoyImageFormat(ImageFormat));
  
 	//Load From File
 	TArray<uint8> RawFileData;
@@ -4414,7 +4229,7 @@ UTexture2D* UVictoryBPFunctionLibrary::Victory_LoadTexture2D_FromFile_Pixels(con
 	UTexture2D* LoadedT2D = NULL;
 	
 	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
-	IImageWrapperPtr ImageWrapper = ImageWrapperModule.CreateImageWrapper(GetJoyImageFormat(ImageFormat));
+	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(GetJoyImageFormat(ImageFormat));
  
 	//Load From File
 	TArray<uint8> RawFileData;
@@ -4642,6 +4457,65 @@ bool UVictoryBPFunctionLibrary::Victory_GetPixelFromT2D(UTexture2D* T2D, int32 X
 	RawImageData->Unlock();
 	return true;
 }
+bool UVictoryBPFunctionLibrary::Victory_GetPixelsArrayFromT2DDynamic(UTexture2DDynamic* T2D, int32& TextureWidth, int32& TextureHeight,TArray<FLinearColor>& PixelArray)
+{
+	if(!T2D) 
+	{
+		return false;
+	}
+	
+	//To prevent overflow in BP if used in a loop
+	PixelArray.Empty();
+	
+	//~~~~~~~~~~~~~~~~~~~~~~
+	// Modifying original here
+	T2D->SRGB = false;
+	T2D->CompressionSettings = TC_VectorDisplacementmap;
+	
+	//Update settings
+	T2D->UpdateResource();
+	//~~~~~~~~~~~~~~~~~~~~~~
+	
+	//Confused, DDC / platform data is invalid for dynamic, how to get its byte data?
+	//FTextureResource from UTexture base class?
+	return false;
+	
+	/*
+	FTexturePlatformData** PtrPtr = T2D->GetRunningPlatformData();
+	if(!PtrPtr) return false;
+	FTexturePlatformData* Ptr = *PtrPtr;
+	if(!Ptr) return false;
+	 
+	FTexture2DMipMap& MyMipMap 	= Ptr->Mips[0];
+	TextureWidth = MyMipMap.SizeX;
+	TextureHeight = MyMipMap.SizeY;
+	 
+	FByteBulkData* RawImageData 	= &MyMipMap.BulkData;
+	
+	if(!RawImageData) 
+	{
+		return false;
+	}
+	
+	FColor* RawColorArray = static_cast<FColor*>(RawImageData->Lock(LOCK_READ_ONLY));
+	
+	UE_LOG(LogTemp,Warning,TEXT("Victory Plugin, Get Pixels, tex width for mip %d"), TextureWidth);
+	UE_LOG(LogTemp,Warning,TEXT("Victory Plugin, Get Pixels, tex width from T2D ptr %d"), T2D->GetSurfaceWidth());
+	 
+	for(int32 x = 0; x < TextureWidth; x++)
+	{
+		for(int32 y = 0; y < TextureHeight; y++)   
+		{
+			PixelArray.Add(RawColorArray[x * TextureWidth + y]); 
+		}
+	}
+	  
+	RawImageData->Unlock();
+	*/
+	
+	return true;
+}
+
 bool UVictoryBPFunctionLibrary::Victory_GetPixelsArrayFromT2D(UTexture2D* T2D, int32& TextureWidth, int32& TextureHeight,TArray<FLinearColor>& PixelArray)
 {
 	if(!T2D) 
@@ -4906,7 +4780,7 @@ bool UVictoryBPFunctionLibrary::Capture2D_Project(class ASceneCapture2D* Target,
     return (Target) ? CaptureComponent2D_Project(Target->GetCaptureComponent2D(), Location, OutPixelLocation) : false;
 }
  
-static IImageWrapperPtr GetImageWrapperByExtention(const FString InImagePath)
+static TSharedPtr<IImageWrapper> GetImageWrapperByExtention(const FString InImagePath)
 {
     IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
     if (InImagePath.EndsWith(".png"))
@@ -4980,7 +4854,7 @@ bool UVictoryBPFunctionLibrary::CaptureComponent2D_SaveImage(class USceneCapture
 		Pixel.A = ((Pixel.R == ClearFColour.R) && (Pixel.G == ClearFColour.G) && (Pixel.B == ClearFColour.B)) ? 0 : 255;
 	}
 	
-	IImageWrapperPtr ImageWrapper = GetImageWrapperByExtention(ImagePath);
+	TSharedPtr<IImageWrapper> ImageWrapper = GetImageWrapperByExtention(ImagePath);
 
 	const int32 Width = Target->TextureTarget->SizeX;
 	const int32 Height = Target->TextureTarget->SizeY;
@@ -5016,7 +4890,7 @@ UTexture2D* UVictoryBPFunctionLibrary::LoadTexture2D_FromFileByExtension(const F
 		return nullptr;
 	}
 	
-	IImageWrapperPtr ImageWrapper = GetImageWrapperByExtention(ImagePath);
+	TSharedPtr<IImageWrapper> ImageWrapper = GetImageWrapperByExtention(ImagePath);
 
 	if (ImageWrapper.IsValid() && ImageWrapper->SetCompressed(CompressedData.GetData(), CompressedData.Num()))
 	{ 
@@ -5051,7 +4925,7 @@ UUserWidget* UVictoryBPFunctionLibrary::GetFirstWidgetOfClass(UObject* WorldCont
 		return nullptr;
 	}
 
-	const UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	const UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 	if (!World)
 	{
 		return nullptr;
@@ -5240,7 +5114,7 @@ void UVictoryBPFunctionLibrary::AddToStreamingLevels(UObject* WorldContextObject
 {
 	bool bResult = true;
 
-	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject);
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 
 	if (World != nullptr)
 	{
@@ -5267,7 +5141,7 @@ void UVictoryBPFunctionLibrary::AddToStreamingLevels(UObject* WorldContextObject
 				PackageName = FName(*PackageNameStr);
 			}
 
-			World->DelayGarbageCollection();
+			GEngine->DelayGarbageCollection();
 
 			// Setup streaming level object that will load specified map
 			ULevelStreamingKismet* StreamingLevel = NewObject<ULevelStreamingKismet>(World, ULevelStreamingKismet::StaticClass(), NAME_None, RF_Transient, nullptr);
@@ -5291,6 +5165,327 @@ void UVictoryBPFunctionLibrary::AddToStreamingLevels(UObject* WorldContextObject
 			World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
 		}
 	}
+}
+
+
+void UVictoryBPFunctionLibrary::RemoveFromStreamingLevels(UObject* WorldContextObject, const FLevelStreamInstanceInfo& LevelInstanceInfo)
+{
+
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
+
+	// Check if the world exists and we have a level to unload
+	if (World != nullptr && !LevelInstanceInfo.PackageName.IsNone())
+	{
+
+#if WITH_EDITOR
+		// If we are using the editor we will use this lambda to remove the play in editor string
+		auto GetCorrectPackageName = [&]( FName PackageName) {
+			FString PackageNameStr = PackageName.ToString();
+			if (GEngine->NetworkRemapPath(World->GetNetDriver(), PackageNameStr, true))
+			{
+				PackageName = FName(*PackageNameStr);
+			}
+
+			return PackageName;
+		};
+#endif
+
+		// Get the package name that we want to check
+		FName PackageNameToCheck = LevelInstanceInfo.PackageName;
+
+#if WITH_EDITOR
+		// Remove the play in editor string and client id to be able to use it with replication
+		PackageNameToCheck = GetCorrectPackageName(PackageNameToCheck);
+#endif
+
+		// Find the level to unload
+		for (auto StreamingLevel : World->StreamingLevels)
+		{
+
+			FName LoadedPackageName = StreamingLevel->GetWorldAssetPackageFName();
+
+#if WITH_EDITOR
+			// Remove the play in editor string and client id to be able to use it with replication
+			LoadedPackageName = GetCorrectPackageName(LoadedPackageName);
+#endif
+
+			// If we find the level unload it and break
+			if(PackageNameToCheck == LoadedPackageName)
+			{
+				// This unload the level
+				StreamingLevel->bShouldBeLoaded = false;
+				StreamingLevel->bShouldBeVisible = false;
+				// This removes the level from the streaming level list
+				StreamingLevel->bIsRequestingUnloadAndRemoval = true;
+				// Force a refresh of the world
+				World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
+				break;
+			}
+		}
+	}
+}
+
+bool UVictoryBPFunctionLibrary::GenericArray_SortCompare(const UProperty* LeftProperty, void* LeftValuePtr, const UProperty* RightProperty, void* RightValuePtr)
+{
+	bool bResult = false;
+
+	if (const UNumericProperty *LeftNumericProperty = Cast<const UNumericProperty>(LeftProperty))
+	{
+		if (LeftNumericProperty->IsFloatingPoint())
+		{
+			bResult = (LeftNumericProperty->GetFloatingPointPropertyValue(LeftValuePtr) < Cast<const UNumericProperty>(RightProperty)->GetFloatingPointPropertyValue(RightValuePtr));
+		}
+		else if (LeftNumericProperty->IsInteger())
+		{
+			bResult = (LeftNumericProperty->GetSignedIntPropertyValue(LeftValuePtr) < Cast<const UNumericProperty>(RightProperty)->GetSignedIntPropertyValue(RightValuePtr));
+		}
+	}
+	else if (const UBoolProperty* LeftBoolProperty = Cast<const UBoolProperty>(LeftProperty))
+	{
+		bResult = (!LeftBoolProperty->GetPropertyValue(LeftValuePtr) && Cast<const UBoolProperty>(RightProperty)->GetPropertyValue(RightValuePtr));
+	}
+	else if (const UNameProperty* LeftNameProperty = Cast<const UNameProperty>(LeftProperty))
+	{
+		bResult = (LeftNameProperty->GetPropertyValue(LeftValuePtr).ToString() < Cast<const UNameProperty>(RightProperty)->GetPropertyValue(RightValuePtr).ToString());
+	}
+	else if (const UStrProperty* LeftStringProperty = Cast<const UStrProperty>(LeftProperty))
+	{
+		bResult = (LeftStringProperty->GetPropertyValue(LeftValuePtr) < Cast<const UStrProperty>(RightProperty)->GetPropertyValue(RightValuePtr));
+	}
+	else if (const UTextProperty* LeftTextProperty = Cast<const UTextProperty>(LeftProperty))
+	{
+		bResult = (LeftTextProperty->GetPropertyValue(LeftValuePtr).ToString() < Cast<const UTextProperty>(RightProperty)->GetPropertyValue(RightValuePtr).ToString());
+	}
+
+	return bResult;
+}
+
+void UVictoryBPFunctionLibrary::GenericArray_Sort(void* TargetArray, const UArrayProperty* ArrayProp, bool bAscendingOrder /* = true */, FName VariableName /* = NAME_None */)
+{
+	if (TargetArray)
+	{
+		FScriptArrayHelper ArrayHelper(ArrayProp, TargetArray);
+		const int32 LastIndex = ArrayHelper.Num();
+
+		if (const UObjectProperty* ObjectProperty = Cast<const UObjectProperty>(ArrayProp->Inner))
+		{
+			for (int32 i = 0; i < LastIndex; ++i)
+			{
+				for (int32 j = 0; j < LastIndex - 1 - i; ++j)
+				{
+					UObject* LeftObject = ObjectProperty->GetObjectPropertyValue(ArrayHelper.GetRawPtr(j));
+					UObject* RightObject = ObjectProperty->GetObjectPropertyValue(ArrayHelper.GetRawPtr(j + 1));
+
+					UProperty* LeftProperty = FindField<UProperty>(LeftObject->GetClass(), VariableName);
+					UProperty* RightProperty = FindField<UProperty>(RightObject->GetClass(), VariableName);
+						
+					if (LeftProperty && RightProperty)
+					{
+						void* LeftValuePtr = LeftProperty->ContainerPtrToValuePtr<void>(LeftObject);
+						void* RightValuePtr = RightProperty->ContainerPtrToValuePtr<void>(RightObject);
+
+						if (GenericArray_SortCompare(LeftProperty, LeftValuePtr, RightProperty, RightValuePtr) != bAscendingOrder)
+						{
+							ArrayHelper.SwapValues(j, j + 1);
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			UProperty* Property = nullptr;
+
+			if (const UStructProperty* StructProperty = Cast<const UStructProperty>(ArrayProp->Inner))
+			{
+				Property = FindField<UProperty>(StructProperty->Struct, VariableName);
+			}
+			else
+			{
+				Property = ArrayProp->Inner;
+			}
+
+			if (Property)
+			{
+				for (int32 i = 0; i < LastIndex; ++i)
+				{
+					for (int32 j = 0; j < LastIndex - 1 - i; ++j)
+					{
+						void* LeftValuePtr = Property->ContainerPtrToValuePtr<void>(ArrayHelper.GetRawPtr(j));
+						void* RightValuePtr = Property->ContainerPtrToValuePtr<void>(ArrayHelper.GetRawPtr(j + 1));
+
+						if (GenericArray_SortCompare(Property, LeftValuePtr, Property, RightValuePtr) != bAscendingOrder)
+						{
+							ArrayHelper.SwapValues(j, j + 1);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void UVictoryBPFunctionLibrary::Array_Sort(const TArray<int32>& TargetArray, bool bAscendingOrder /* = true */, FName VariableName /* = NAME_None */)
+{
+	// We should never hit these!  They're stubs to avoid NoExport on the class.  Call the Generic* equivalent instead
+	check(0);
+}
+
+void UVictoryBPFunctionLibrary::Actor_PrestreamTextures(AActor* Target, float Seconds, bool bEnableStreaming /*= true*/, int32 CinematicTextureGroups /*= 0*/)
+{
+	if (Target != nullptr)
+	{
+		Target->PrestreamTextures(Seconds, bEnableStreaming, CinematicTextureGroups);
+	}
+}
+
+void UVictoryBPFunctionLibrary::Component_PrestreamTextures(UMeshComponent* Target, float Seconds, bool bEnableStreaming /*= true*/, int32 CinematicTextureGroups /*= 0*/)
+{
+	if ((Target != nullptr) && (Target->IsRegistered()))
+	{
+		float Duration = Seconds;
+
+		if (bEnableStreaming)
+		{
+			// A Seconds==0.0f, it means infinite (e.g. 30 days)
+			Duration = FMath::IsNearlyZero(Seconds) ? (60.0f*60.0f*24.0f*30.0f) : Seconds;
+		}
+
+		Target->PrestreamTextures(Duration, false, CinematicTextureGroups);
+	}
+}
+
+bool UVictoryBPFunctionLibrary::GetViewportPosition(UObject* WorldContextObject, const FVector2D& ScreenPosition, FVector2D& OutViewportPosition)
+{
+	OutViewportPosition = FVector2D::ZeroVector;
+
+	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull))
+	{
+		FVector2D ViewportSize;
+		World->GetGameViewport()->GetViewportSize(ViewportSize);
+		OutViewportPosition = World->GetGameViewport()->Viewport->VirtualDesktopPixelToViewport(FIntPoint(ScreenPosition.X, ScreenPosition.Y)) * ViewportSize;
+	}
+
+	return !OutViewportPosition.IsZero();
+}
+
+bool UVictoryBPFunctionLibrary::GetViewportPositionHitResultByChannel(UObject* WorldContextObject, const FVector2D& ViewportPosition, ECollisionChannel TraceChannel, bool bTraceComplex, FHitResult& OutHitResult)
+{
+	bool bResult = false;
+
+	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull))
+	{
+		bResult = World->GetFirstPlayerController()->GetHitResultAtScreenPosition(ViewportPosition, TraceChannel, bTraceComplex, OutHitResult);
+	}
+
+	if (!bResult)	// For Blueprint users
+	{
+		OutHitResult = FHitResult();
+	}
+
+	return bResult;
+}
+
+bool UVictoryBPFunctionLibrary::ViewportPositionDeproject(UObject* WorldContextObject, const FVector2D& ViewportPosition, FVector& OutWorldOrigin, FVector& OutWorldDirection)
+{
+	bool bResult = false;
+
+	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull))
+	{
+		bResult = UGameplayStatics::DeprojectScreenToWorld(World->GetFirstPlayerController(), ViewportPosition, OutWorldOrigin, OutWorldDirection);
+	}
+
+	return bResult;
+}
+
+UPanelSlot* UVictoryBPFunctionLibrary::InsertChildAt(UWidget* Parent, int32 Index, UWidget* Content)
+{
+	UPanelSlot* ResultSlot = nullptr;
+
+	if (Parent && Content)
+	{
+		if (UPanelWidget* PanelWidget = Cast<UPanelWidget>(Parent))
+		{
+			Index = FMath::Clamp(Index, 0, FMath::Max(0, PanelWidget->GetChildrenCount() - 1));
+
+			if (PanelWidget->GetChildIndex(Content) != Index)
+			{
+				ResultSlot = PanelWidget->AddChild(Content);
+
+				UWidget* SlotContent = nullptr;
+
+				for (int32 i = Index; i < PanelWidget->GetChildrenCount(); ++i)
+				{
+					SlotContent = PanelWidget->GetChildAt(Index);
+					if (SlotContent == Content)
+					{
+						break;
+					}
+					PanelWidget->RemoveChild(SlotContent);
+					PanelWidget->AddChild(SlotContent);
+				}
+			}
+		}
+	}
+
+	return ResultSlot;
+}
+
+void UVictoryBPFunctionLibrary::FlushPressedKeys(class APlayerController* PlayerController)
+{
+	if (PlayerController)
+	{
+		PlayerController->FlushPressedKeys();
+	}
+}
+
+FVector UVictoryBPFunctionLibrary::GetVectorRelativeLocation(FVector ParentLocation, FRotator ParentRotation, FVector ChildLocation)
+{
+	return ParentRotation.UnrotateVector(ChildLocation - ParentLocation);
+}
+
+FVector UVictoryBPFunctionLibrary::GetComponentRelativeLocation(class USceneComponent* ParentComponent, class USceneComponent* ChildComponent)
+{
+	return (ParentComponent && ChildComponent) ? GetVectorRelativeLocation(ParentComponent->GetComponentLocation(), ParentComponent->GetComponentRotation(), ChildComponent->GetComponentLocation()) : FVector::ZeroVector;
+}
+
+FVector UVictoryBPFunctionLibrary::GetActorRelativeLocation(class AActor* ParentActor, class AActor* ChildActor)
+{
+	return (ParentActor && ChildActor) ? GetVectorRelativeLocation(ParentActor->GetActorLocation(), ParentActor->GetActorRotation(), ChildActor->GetActorLocation()) : FVector::ZeroVector;
+}
+
+FRotator UVictoryBPFunctionLibrary::GetRotatorRelativeRotation(FRotator ParentRotation, FRotator ChildRotation)
+{
+	const FRotator RelativeRotation = (FQuatRotationMatrix(ChildRotation.Quaternion()) * FQuatRotationMatrix(ParentRotation.Quaternion()).GetTransposed()).Rotator();
+
+	return RelativeRotation;
+}
+
+FRotator UVictoryBPFunctionLibrary::GetComponentRelativeRotation(class USceneComponent* ParentComponent, class USceneComponent* ChildComponent)
+{
+	return (ParentComponent && ChildComponent) ? GetRotatorRelativeRotation(ParentComponent->GetComponentRotation(), ChildComponent->GetComponentRotation())  : FRotator::ZeroRotator;
+}
+
+FRotator UVictoryBPFunctionLibrary::GetActorRelativeRotation(class AActor* ParentActor, class AActor* ChildActor)
+{
+	return (ParentActor && ChildActor) ? GetRotatorRelativeRotation(ParentActor->GetActorRotation(), ChildActor->GetActorRotation()) : FRotator::ZeroRotator;
+}
+
+float UVictoryBPFunctionLibrary::HorizontalFOV(float VerticalFOV, float AspectRatio)
+{
+	VerticalFOV = FMath::DegreesToRadians(VerticalFOV);
+	return FMath::RadiansToDegrees(2 * FMath::Atan2(FMath::Tan(VerticalFOV * 0.5f) * AspectRatio, 1));
+}
+
+float UVictoryBPFunctionLibrary::VerticalFOV(float HorizontalFOV, float AspectRatio)
+{
+	HorizontalFOV = FMath::DegreesToRadians(HorizontalFOV);
+	return FMath::RadiansToDegrees(2 * FMath::Atan2(FMath::Tan(HorizontalFOV * 0.5f) * (1 / AspectRatio), 1));
+}
+
+bool UVictoryBPFunctionLibrary::StringIsEmpty(const FString& Target)
+{
+	return Target.IsEmpty();
 }
 
 //~~~~~~~~~ END OF CONTRIBUTED BY KRIS ~~~~~~~~~~~

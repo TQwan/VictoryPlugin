@@ -4,8 +4,10 @@ using UnrealBuildTool;
 
 public class VictoryBPLibrary : ModuleRules
 {
-	public VictoryBPLibrary(TargetInfo Target)
-	{
+	public VictoryBPLibrary(ReadOnlyTargetRules Target) : base(Target)
+	{ 
+		//4.15 Include What You Use
+		bEnforceIWYU = false;
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
@@ -28,7 +30,7 @@ public class VictoryBPLibrary : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",
+				"Core"
 				
 				// ... add other public dependencies that you statically link with here ...
 			}
@@ -54,7 +56,10 @@ public class VictoryBPLibrary : ModuleRules
 				
 				"HeadMountedDisplay",
   
-                "AIModule"	
+                "AIModule",
+				
+				//FPlatformApplicationMisc
+				"ApplicationCore"
 			}
 			);
 		
@@ -67,6 +72,14 @@ public class VictoryBPLibrary : ModuleRules
 				"APEX"
 			}
 			);
+			
+			PublicDependencyModuleNames.AddRange(
+			new string[]
+			{
+				"ApexDestruction"
+			}
+			);
+		
 		}
 	
 		 
